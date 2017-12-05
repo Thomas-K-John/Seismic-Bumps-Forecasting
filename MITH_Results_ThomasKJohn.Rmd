@@ -1,0 +1,211 @@
+---
+title: "SesmicActivity"
+author: "Thomas K John"
+date: "August 12, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Removing the environment variables
+```{r}
+rm(list = ls(all = TRUE))
+```
+## Setting the working directory
+```{r}
+setwd("I:/DATA-SCIENCE/Insofe/Mi-TH/mith-aug2017-Thomas-K-John-master")
+```
+# Librarys used
+```{r}
+library(RWeka)
+library(DMwR)
+library(e1071)
+library(corrplot)
+library(arules)
+library(MASS)
+library(car)
+library(ROCR)
+library(caret)
+library(vegan)
+```
+
+# Reading the files
+```{r}
+train.data = read.arff("train.arff")
+validation.data = read.arff("validation.arff")
+test.data = read.arff("test.arff")
+```
+# Renaming the files
+```{r}
+colnames(train.data) = c("Index-1","HASM-2", "HASA-3", "TypeOfShift-4", "SE-GMax-5", "NoOfPulseGMax-6", "DevEnery-7", "DevNoOfPulse-8", "Result-SA-9", "NoOfSB-E-10", "NoOFSB_1-11", "NoOFSB_2-12","NoOFSB_3-13","NoOFSB_4-14","NoOFSB_5-15","NoOFSB_6-16","NoOFSB_7-17", "TotalEnergySB-18", "MaxEnergySB-19", "TARGET")
+
+colnames(validation.data) = c("Index-1","HASM-2", "HASA-3", "TypeOfShift-4", "SE-GMax-5", "NoOfPulseGMax-6", "DevEnery-7", "DevNoOfPulse-8", "Result-SA-9", "NoOfSB-E-10", "NoOFSB_1-11", "NoOFSB_2-12","NoOFSB_3-13","NoOFSB_4-14","NoOFSB_5-15","NoOFSB_6-16","NoOFSB_7-17", "TotalEnergySB-18", "MaxEnergySB-19", "TARGET")
+
+colnames(test.data) = c("Index-1","HASM-2", "HASA-3", "TypeOfShift-4", "SE-GMax-5", "NoOfPulseGMax-6", "DevEnery-7", "DevNoOfPulse-8", "Result-SA-9", "NoOfSB-E-10", "NoOFSB_1-11", "NoOFSB_2-12","NoOFSB_3-13","NoOFSB_4-14","NoOFSB_5-15","NoOFSB_6-16","NoOFSB_7-17", "TotalEnergySB-18", "MaxEnergySB-19")
+```
+# Saving the row index from test data
+```{r}
+test.data.index = test.data[,"Index-1"]
+```
+# Saving the TARGET variable from train and validation data
+```{r}
+train.data.target = train.data$TARGET
+#validation.data.target = validation.data$TARGET
+
+```
+# Converting the TARGET variable to factors
+```{r}
+train.data.target.cat = data.frame(as.factor(as.character(train.data.target)))
+validation.data$TARGET = as.factor(as.character(validation.data$TARGET))
+```
+
+
+# Removing the row index since it is not useful in prediction
+```{r}
+train.data$`Index-1` = NULL
+validation.data$`Index-1` = NULL
+test.data$`Index-1` = NULL
+```
+# Removing the "NoOFSB_5-15","NoOFSB_6-16","NoOFSB_7-17" attributes since not important
+```{r}
+train.data[c("NoOFSB_5-15", "NoOFSB_6-16", "NoOFSB_7-17")] = NULL
+validation.data[c("NoOFSB_5-15", "NoOFSB_6-16", "NoOFSB_7-17")] = NULL
+test.data[c("NoOFSB_5-15", "NoOFSB_6-16", "NoOFSB_7-17")] = NULL
+```
+
+# Structure and Summary of the data
+```{r}
+str(train.data)
+summary(train.data)
+summary(test.data)
+summary(validation.data)
+sum(is.na(train.data))
+```
+
+
+# Applying KNN Imputation on the training data to remove the NAs
+```{r}
+train.data = knnImputation(data = train.data, k = 5)
+```
+
+
+# Verifying data 
+```{r}
+summary(train.data)
+boxplot(train.data$`SE-GMax`)
+boxplot(test.data$`SE-GMax-5`, range = TRUE)
+#test.data$`SE-GMax-5`[which(test.data$`SE-GMax-5` > 500000 & test.data$`SE-GMax-5` <2000000)]
+test.data$`SE-GMax-5`[which(test.data$`SE-GMax-5` > 500000)] = 500000
+train.data$`SE-GMax-5`[which(train.data$`SE-GMax-5` > 500000)] = 500000
+validation.data$`SE-GMax-5`[which(validation.data$`SE-GMax-5` > 500000)] = 500000
+
+train.data$`NoOfPulseGMax-6`[which(train.data$`NoOfPulseGMax-6` > 1000)] = 1000
+test.data$`NoOfPulseGMax-6`[which(test.data$`NoOfPulseGMax-6` > 1000)] = 1000
+validation.data$`NoOfPulseGMax-6`[which(validation.data$`NoOfPulseGMax-6` > 1000)] = 1000
+boxplot(train.data$`TotalEnergySB-18`)
+
+# Removing outlier
+quantile(train.data$`DevEnery-7`)
+train.data$`DevEnery-7`[which(train.data$`DevEnery-7` > 600)] = 600
+train.data$`DevEnery-7`[which(train.data$`DevEnery-7` > 600)] = 600
+validation.data$`DevEnery-7`[which(validation.data$`DevEnery-7` > 600)] = 600
+
+boxplot(test.data$`DevEnery-7`, range = TRUE)
+boxplot(test.data$`SE-GMax-5`, range = TRUE)
+str(train.data)
+skewness(train.data$`SE-GMax`, na.rm = TRUE)
+skewness(train.data$NoOfPulseGMax)
+skewness(sqrt(train.data$`NoOfPulseGMax-6`))
+skewness(log10(train.data$`SE-GMax`))
+skewness(train.data$`SE-GMax`)
+```
+
+# Splitting the data into numerical and categorical data
+```{r}
+categorical_variables = c("HASM-2", "HASA-3", "TypeOfShift-4", "Result-SA-9")
+numerical_variables = setdiff(x= names(train.data), y = c(categorical_variables,"TARGET"))
+train.data.categorical = train.data[, categorical_variables]
+train.data.numerical = train.data[, numerical_variables]
+
+```
+# Finding the relation  among numerical variables
+```{r}
+cor_values = cor(train.data.numerical)
+corrplot(cor_values)
+```
+
+# Finding the relation  of categorical variables with TARGET variable using Association rules
+```{r}
+train.data.cat.combined = cbind(train.data.categorical, train.data.target.cat)
+colnames(train.data.cat.combined)[5] = "TARGET"
+arules = apriori(train.data.cat.combined, parameter = list(minlen = 2, supp = 0.5, conf = 0.8), appearance = list(rhs = c("TARGET=1", "TARGET=0"), default = "lhs"))
+inspect(arules)
+arules.sorted = sort(arules, by = "lift")
+inspect(arules.sorted)
+subset.matrix = is.subset(arules.sorted, arules.sorted, sparse = FALSE)
+subset.matrix[lower.tri(subset.matrix, diag = TRUE)] = NA
+redundant = colSums(subset.matrix, na.rm = TRUE) >= 1
+rules.pruned = arules.sorted[!redundant]
+inspect(rules.pruned)
+
+```
+# Logistic Regression Modeling
+```{r}
+train.attributes = cbind(train.data.numerical, train.data.categorical, train.data.target.cat)
+colnames(train.attributes)[16] = "TARGET"
+str(train.attributes)
+
+# Creating a logistic regression model.
+logistic.model = glm(formula = TARGET~`HASM-2`+`HASA-3`+`TypeOfShift-4`+`SE-GMax-5`+`NoOfPulseGMax-6`+`DevEnery-7`+`DevNoOfPulse-8`+`Result-SA-9`+`NoOfSB-E-10`+`NoOFSB_1-11`+`NoOFSB_2-12`+`NoOFSB_3-13`+`NoOFSB_4-14`+`TotalEnergySB-18`+`MaxEnergySB-19`, family = "binomial", data = train.attributes)
+summary(logistic.model)
+str(train.attributes)
+# Applying stepAIC()
+log.reg.step = stepAIC(logistic.model, direction = "both")
+
+# Applying vif()
+log.reg.vif = vif(log.reg.step)
+print(log.reg.vif)
+```
+
+# ROC
+```{r}
+prob.train = predict(log.reg.step, type = "response")
+pred.train = prediction(prob.train, train.attributes$TARGET)
+perf.train = performance(pred.train,measure = "tpr", x.measure = "fpr")
+plot(perf.train, col = rainbow(10) , colorize = T, print.cutoffs.at=seq(0,1,0.05) )
+```
+# AUC Source
+```{r}
+perf.auc = performance(pred.train, measure = "auc")
+auc = perf.auc@y.values[[1]]
+auc
+```
+# Prediction on Validation data
+```{r}
+prob.validation = predict(log.reg.step, validation.data, type = "response")
+summary(prob.validation)
+pred.validation = ifelse(prob.validation > 0.1, "1", "0")
+table(pred.validation)
+confusionMatrix(pred.validation, validation.data$TARGET )
+```
+
+# Predicting on test data
+```{r}
+prob.test = predict(log.reg.step, test.data, type = "response")
+summary(prob.test)
+pred.test = ifelse(prob.test > 0.1, "1", "0")
+pred.test = data.frame(pred.test)
+names(pred.test)
+test.data.index= data.frame(test.data.index)
+summary(pred.test)
+test.result.logistic = cbind(test.data.index, pred.test)
+write.csv(x = test.result.logistic , file = "ThomasKJohn_Batch_30_1.csv", row.names = FALSE )
+
+```
+
+
+
+
+
+
